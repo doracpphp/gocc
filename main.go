@@ -5,6 +5,29 @@ import (
 	"os"
 )
 
+func isdigit(ch byte) bool {
+	if '0' <= ch && '9' >= ch {
+		return true
+	}
+	return false
+}
+func strtol(str string, index int) ([]byte, int) {
+	var num []byte
+	for i := index; i < len(str); i++ {
+		if isdigit(str[i]) {
+			num = append(num, str[i])
+		} else {
+			return num, i - 1
+		}
+	}
+	return num, len(str) - 1
+}
+func isspace(ch byte) bool {
+	if ch == ' ' {
+		return true
+	}
+	return false
+}
 func main() {
 	if len(os.Args) != 2 {
 		fmt.Errorf("引数の個数が正しくありません\n")
@@ -12,17 +35,23 @@ func main() {
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
-	fmt.Printf("  mov rax, %d\n", os.Args[1][0]-'0')
-	for i := 1; i < len(os.Args[1]); i++ {
+	s, index := strtol(os.Args[1], 0)
+	index++
+	fmt.Printf("  mov rax, %s \n", s)
+	for i := index; i < len(os.Args[1])-1; i++ {
 		p := os.Args[1][i]
 		if p == '+' {
 			i++
-			fmt.Printf("  add rax, %d\n", os.Args[1][i]-'0')
+			s, index := strtol(os.Args[1], i)
+			i = index
+			fmt.Printf("  add rax, %s\n", s)
 			continue
 		}
 		if p == '-' {
 			i++
-			fmt.Printf("  sub rax, %d\n", os.Args[1][i]-'0')
+			s, index := strtol(os.Args[1], i)
+			i = index
+			fmt.Printf("  sub rax, %s\n", s)
 			continue
 		}
 		fmt.Errorf("予期しない文字です: '%c'\n", p)
