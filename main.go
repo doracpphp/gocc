@@ -21,10 +21,102 @@ type Token struct {
 	val  int
 	str  []byte
 }
+type NodeKind int
 
+const (
+	NDADD NodeKind = iota
+	NDSUB          // -
+	NDMUL          // *
+	NDDIV          // /
+	NDNUM          // 整数
+)
+
+type Node struct {
+	kind NodeKind
+	lhs  *Node
+	rhs  *Node
+	val  int
+}
+
+func NewNode(kind NodeKind, lhs *Node, rhs *Node) *Node {
+	node := &Node{kind: kind, lhs: lhs, rhs: rhs}
+	return node
+}
+func NewNodeNum(val int) *Node {
+	node := &Node{kind: NDNUM, val: val}
+	return node
+}
+func expr(token *Token) (*Node, *Token) {
+	node, token := mul(token)
+	for {
+		if ok, tok := consume('+', token); ok {
+			rnode, tok := mul(tok)
+			node = NewNode(NDADD, node, rnode)
+			token = tok
+		} else if ok, tok := consume('-', token); ok {
+			rnode, tok := mul(tok)
+			node = NewNode(NDSUB, node, rnode)
+			token = tok
+		} else {
+			return node, token
+		}
+	}
+
+}
+func mul(token *Token) (*Node, *Token) {
+	node, token := primary(token)
+	for {
+		if ok, tok := consume('*', token); ok {
+			rnode, tok := primary(tok)
+			node = NewNode(NDMUL, node, rnode)
+			token = tok
+		} else if ok, tok := consume('/', token); ok {
+			rnode, tok := primary(tok)
+			node = NewNode(NDDIV, node, rnode)
+			token = tok
+		} else {
+			return node, token
+		}
+	}
+}
+func primary(token *Token) (*Node, *Token) {
+	if ok, tok := consume('(', token); ok {
+		node, token := expr(tok)
+		token = expect(')', token)
+		return node, token
+	}
+	n, token := expect_number(token)
+	return NewNodeNum(n), token
+}
+func gen(node *Node) {
+	if node.kind == NDNUM {
+		fmt.Printf("  push %d\n", node.val)
+		return
+	}
+	gen(node.lhs)
+	gen(node.rhs)
+	fmt.Printf("  pop rdi\n")
+	fmt.Printf("  pop rax\n")
+	switch node.kind {
+	case NDADD:
+		fmt.Printf("  add rax, rdi\n")
+		break
+	case NDSUB:
+		fmt.Printf("  sub rax, rdi\n")
+		break
+	case NDMUL:
+		fmt.Printf("  imul rax, rdi\n")
+		break
+	case NDDIV:
+		fmt.Printf("  cqo\n")
+		fmt.Printf("  idiv rdi\n")
+		break
+	}
+	fmt.Printf("  push rax\n")
+}
 func consume(op byte, tok *Token) (bool, *Token) {
 	if tok.kind != TKRESERVED || tok.str[0] != op {
-		return false, tok.next
+		return false, tok
 	}
 	return true, tok.next
 }
@@ -59,7 +151,7 @@ func tokenize(str string) *Token {
 			i++
 			continue
 		}
-		if p == '+' || p == '-' {
+		if p == '+' || p == '-' || p == '*' || p == '/' || p == '(' || p == ')' {
 			cur = NewToken(TKRESERVED, cur, []byte{p})
 			continue
 		}
@@ -106,20 +198,11 @@ func main() {
 		fmt.Errorf("引数の個数が正しくありません\n")
 	}
 	token := tokenize(os.Args[1])
+	node, token := expr(token)
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
-	n, token := expect_number(token)
-	fmt.Printf("  mov rax, %d\n", n)
-	for !at_eof(token) {
-		if ok, tok := consume('+', token); ok {
-			n, token = expect_number(tok)
-			fmt.Printf("  add rax, %d\n", n)
-			continue
-		}
-		tok := expect('-', token)
-		n, token = expect_number(tok)
-		fmt.Printf("  sub rax, %d\n", n)
-	}
+	gen(node)
+	fmt.Printf("  pop rax\n")
 	fmt.Printf("  ret\n")
 }
