@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 )
 
 func main() {
@@ -13,10 +12,21 @@ func main() {
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
-	n, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		panic(err)
+	fmt.Printf("  mov rax, %d\n", os.Args[1][0]-'0')
+	for i := 1; i < len(os.Args[1]); i++ {
+		p := os.Args[1][i]
+		if p == '+' {
+			i++
+			fmt.Printf("  add rax, %d\n", os.Args[1][i]-'0')
+			continue
+		}
+		if p == '-' {
+			i++
+			fmt.Printf("  sub rax, %d\n", os.Args[1][i]-'0')
+			continue
+		}
+		fmt.Errorf("予期しない文字です: '%c'\n", p)
+		os.Exit(1)
 	}
-	fmt.Printf("  mov rax, %d\n", n)
 	fmt.Printf("  ret\n")
 }
